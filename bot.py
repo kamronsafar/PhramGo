@@ -15,7 +15,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
 logging.basicConfig(level=logging.INFO)
-# OpenAI API kalitini o'rnating
+
 openai.api_key = OPENAI_API_KEY
 class Form(StatesGroup):
     diagnostic = State()
@@ -33,7 +33,6 @@ def get_clinic_data():
     conn.close()
     return [{"name": row[0], "latitude": float(row[1]), "longitude": float(row[2]), "phone": row[3], "address": row[4]} for row in clinics]
 
-# Aptekalar ma'lumotlarini olish
 def get_pharmacy_data():
     conn = sqlite3.connect('base.db')
     cursor = conn.cursor()
@@ -42,17 +41,14 @@ def get_pharmacy_data():
     conn.close()
     return [{"name": row[0], "latitude": float(row[1]), "longitude": float(row[2]), "phone": row[3], "address": row[4]} for row in pharmacies]
 
-# Masofani hisoblash
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # Yerning radiusi, km
+    R = 6371 
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
     a = (math.sin(delta_phi / 2) ** 2 +
          math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2)
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-# Menu handler
 
 menu_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 menu_keyboard.add(KeyboardButton("Geolokatsiyani yuborish", request_location=True))
@@ -85,7 +81,6 @@ async def emergency_help(message: types.Message):
     await Form.location.set()
     await message.answer(response, parse_mode="HTML", reply_markup=keyboard)
 
-# Geolokatsiya qabul qilish
 @dp.message_handler(content_types=types.ContentType.LOCATION, state=Form.location)
 async def handle_location(message: types.Message, state: FSMContext):
     if message.location:
@@ -100,19 +95,15 @@ async def discard_location(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=menu_keyboard)
     await state.finish()
 
-
-# Foydalanuvchi geolokatsiyasini saqlash uchun lug'at
 user_locations = {}
 def search_drug_keyboard():
     exit_button = KeyboardButton("Exit")
     return ReplyKeyboardMarkup(resize_keyboard=True).add(exit_button)
 
-# Geolokatsiya qabul qilish
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def handle_location(message: types.Message):
     if message.location:
         user_lat, user_lon = message.location.latitude, message.location.longitude
-        # Foydalanuvchining geolokatsiyasini saqlash
         user_locations[message.from_user.id] = (user_lat, user_lon)
         conn = sqlite3.connect('base.db')
         cursor = conn.cursor()
@@ -134,7 +125,6 @@ async def show_pharmacies(callback_query: types.CallbackQuery):
     user_lat, user_lon = user_locations.get(callback_query.from_user.id, (None, None))
     
     if user_lat is None or user_lon is None:
-        # Foydalanuvchidan yana geolokatsiya yuborishni so'rash
         await callback_query.message.answer("Geolokatsiyani yuboring.")
         return
 
@@ -154,7 +144,7 @@ async def show_clinics(callback_query: types.CallbackQuery):
     user_lat, user_lon = user_locations.get(callback_query.from_user.id, (None, None))
     
     if user_lat is None or user_lon is None:
-        # Foydalanuvchidan yana geolokatsiya yuborishni so'rash
+
         await callback_query.message.answer("Geolokatsiyani yuboring.")
         return
 
@@ -168,14 +158,12 @@ async def show_clinics(callback_query: types.CallbackQuery):
     else:
         response = "2 km radiusda klinikalar topilmadi. Radiusni kengaytirish uchun qayta urinib ko'ring."
     await bot.send_message(callback_query.from_user.id, response, parse_mode="HTML",  disable_web_page_preview=True)
-# Diagnostic rejim bayrog'i
-user_diagnostic_mode = set()  # Foydalanuvchi ID larini saqlash uchun
+
+user_diagnostic_mode = set()
 
 diagnostic_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 diagnostic_keyboard.add(KeyboardButton("exit"))
 
-
-# Diagnostika rejimiga o'tish
 @dp.message_handler(lambda message: message.text.lower() == "diagnostika")
 async def ask_diagnostic(message: types.Message):
     user_diagnostic_mode.add(message.from_user.id)
@@ -184,7 +172,6 @@ async def ask_diagnostic(message: types.Message):
         reply_markup=diagnostic_keyboard
     )
 
-# Diagnostika rejimi ichida xabarlarni qayta ishlash
 @dp.message_handler(lambda message: message.from_user.id in user_diagnostic_mode)
 async def handle_diagnostic(message: types.Message):
     if message.text.lower() == "exit":
@@ -192,7 +179,7 @@ async def handle_diagnostic(message: types.Message):
         await message.answer("👋 Diagnostika rejimidan chiqdingiz. Boshqa buyruqlar uchun asosiy rejimga qaytdingiz.", )
     else:
         try:
-            # OpenAI API chaqiruvi
+         
             response = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "system", "content": "Siz foydalanuvchilarga yordam beruvchi Telegram botisiz va ularning kasalligini aniqlab qaysi dorilar olishga yordamlashasiz kasalligini aniqlab aytshiz kerak"},
@@ -205,13 +192,10 @@ async def handle_diagnostic(message: types.Message):
 
         await message.reply(reply)
 
-
-# Dorini qidirish
 @dp.message_handler(lambda message: message.text.lower() == "dorini qidirish")
 async def ask_drug_search(message: types.Message):
     await message.answer("Dori nomini kiriting:", reply_markup=search_drug_keyboard())
 
-# O'xshash dorilarni qidirish
 def get_similar_drugs(drug_name):
     conn = sqlite3.connect('base.db')
     cursor = conn.cursor()
